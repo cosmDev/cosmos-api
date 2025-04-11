@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cosmos Pro Swap</title>
+    <style>
+        :root {
+            --primary: #2f855a;
+            --background: #0f172a;
+            --surface: #1e293b;
+            --text: #f8fafc;
+            --border: #334155;
+            --hover: #475569;
+            --success: #22c55e;
+            --error: #ef4444;
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: var(--background);
+            color: var(--text);
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 24px;
+            margin-top: 24px;
+        }
+
+        .card {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border);
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px;
+            background: var(--background);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            transition: all 0.3s ease;
+        }
+
+        .button-primary {
+            background: var(--primary);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            border: none;
+        }
+
+        .swap-container {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin: 20px 0;
+        }
+
+        .token-selector {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .swap-direction-button {
+            background: var(--surface);
+            border: 2px solid var(--border);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            margin: 0 auto;
+        }
+
+        .balance-display {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9em;
+            color: #94a3b8;
+            margin-top: 8px;
+        }
+
+        .max-button {
+            background: rgba(47, 133, 90, 0.2);
+            color: var(--primary);
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 8px;
+        }
+
+        #status {
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 16px;
+        }
+
+        .success {
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid var(--success);
+        }
+
+        .error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--error);
+        }
+        .price-impact-warning {
+            color: var(--error);
+            font-size: 0.9em;
+            margin-top: 4px;
+        }
+        
+        .high-impact {
+            color: var(--error);
+        }
+        
+        .moderate-impact {
+            color: #eab308; /* yellow color */
+        }
+    </style>
+</head>
+<body>
+    <h1>🔄 Cosmos Pro Swap</h1>
+    
+    <div id="wallet-connect" class="card">
+        <button class="button-primary" onclick="connectWallet()">Connect Keplr</button>
+        <div id="wallet-info" style="margin-top: 12px; display: none;">
+            <div class="balance-display">
+                <span>Connected:</span>
+                <span id="wallet-address"></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid-container">
+        <div class="main-content">
+            <div class="card">
+                <div class="form-group">
+                    <label>Select Liquidity Pool</label>
+                    <select id="pool-list" class="form-control" onchange="loadPoolDetails()"></select>
+                </div>
+
+                <div class="swap-container">
+                    <div class="form-group">
+                        <label>From</label>
+                        <div class="token-selector">
+                            <select id="from-denom" class="form-control" onchange="updateSwapParams()"></select>
+                            <input type="number" id="from-amount" class="form-control" 
+                                   placeholder="0.0" step="any" oninput="calculatePrice()">
+                        </div>
+                        <div class="balance-display">
+                            <span>Balance: <span id="from-balance">0.00</span></span>
+                            <span class="max-button" onclick="setMaxBalance()">MAX</span>
+                        </div>
+                    </div>
+
+                    <div class="swap-direction-button" onclick="swapDirection()">
+                        ↓↑
+                    </div>
+
+                    <div class="form-group">
+                        <label>To</label>
+                        <div class="token-selector">
+                            <select id="to-denom" class="form-control" onchange="updateSwapParams()"></select>
+                            <input type="text" id="to-amount" class="form-control" 
+                                   placeholder="0.0" readonly>
+                        </div>
+                        <div class="balance-display">
+                            <span>Balance: <span id="to-balance">0.00</span></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <div class="balance-display">
+                        <span>Price Impact:</span>
+                        <span id="price-impact">0.00%</span>
+                    </div>
+                    <div id="price-impact-warning" class="price-impact-warning"></div>
+                    <div class="balance-display">
+                        <span>Fee:</span>
+                        <span id="swap-fee">0.00</span>
+                    </div>
+                </div>
+
+                <button class="button-primary" onclick="executeSwap()" style="width: 100%;">
+                    Execute Swap
+                </button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Pool Information</h3>
+            <div id="pool-balances" style="margin-top: 12px;"></div>
+        </div>
+    </div>
+
+    <div id="status"></div>
+
+    <!-- CosmJS Dependencies -->
+    <!-- Add type="module" and use specific ESM paths -->
+    <script type="module">
+    import { assert } from 'https://cdn.jsdelivr.net/npm/@cosmjs/utils@0.29.5/+esm';
+    import { Decimal } from 'https://cdn.jsdelivr.net/npm/@cosmjs/math@0.29.5/+esm';
+    import { toBase64 } from 'https://cdn.jsdelivr.net/npm/@cosmjs/encoding@0.29.5/+esm';
+    import { encodeSecp256k1Signature } from 'https://cdn.jsdelivr.net/npm/@cosmjs/amino@0.29.5/+esm';
+    import { SigningStargateClient } from 'https://cdn.jsdelivr.net/npm/@cosmjs/stargate@0.29.5/+esm';
+    
+    // Your code here
+    </script>
+
+    <script>
+        const chainId = 'arkh';
+        const apiUrl = 'https://arkh.api.m.anode.team';
+        const rpcUrl = 'https://arkh.rpc.m.anode.team';
+        const decimalMultiplier = 1e6;
+
+        const tokenRegistry = {
+            'uarkh': { symbol: 'ARKH', decimals: 6 },
+            'uatom': { symbol: 'ATOM', decimals: 6 },
+            'uosmo': { symbol: 'OSMO', decimals: 6 }
+        };
+
+        let walletAddress = null;
+        let currentPool = null;
+        let userBalances = {};
+
+        // Fixed function added here
+        function updateSwapParams() {
+            updateBalances();
+            calculatePrice();
+        }
+
+        async function connectWallet() {
+            try {
+                if (!window.keplr) throw new Error('Please install Keplr wallet');
+                
+                await window.keplr.enable(chainId);
+                const offlineSigner = window.keplr.getOfflineSigner(chainId);
+                const accounts = await offlineSigner.getAccounts();
+                
+                walletAddress = accounts[0]?.address;
+                if (!walletAddress) throw new Error('Failed to get wallet address');
+                
+                document.getElementById('wallet-info').style.display = 'block';
+                document.getElementById('wallet-address').textContent = 
+                    `${walletAddress.slice(0, 8)}...${walletAddress.slice(-4)}`;
+                
+                await loadUserBalances();
+                await loadPools();
+            } catch (error) {
+                showStatus(`Wallet Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function loadUserBalances() {
+            try {
+                const response = await fetch(`${apiUrl}/cosmos/bank/v1beta1/balances/${walletAddress}`);
+                const { balances } = await response.json();
+                
+                userBalances = balances.reduce((acc, coin) => {
+                    acc[coin.denom] = (coin.amount / decimalMultiplier).toFixed(6);
+                    return acc;
+                }, {});
+            } catch (error) {
+                showStatus(`Balance Load Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function loadPools() {
+            try {
+                const response = await fetch(`${apiUrl}/cosmos/liquidity/v1beta1/pools`);
+                const { pools } = await response.json();
+                
+                const poolSelect = document.getElementById('pool-list');
+                poolSelect.innerHTML = pools.map(pool => `
+                    <option value="${pool.id}">
+                        ${formatDenoms(pool.reserve_coin_denoms)}
+                    </option>
+                `).join('');
+                
+                if (pools.length) await loadPoolDetails();
+            } catch (error) {
+                showStatus(`Pool Load Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function loadPoolDetails() {
+            const poolId = document.getElementById('pool-list').value;
+            try {
+                const poolRes = await fetch(`${apiUrl}/cosmos/liquidity/v1beta1/pools/${poolId}`);
+                const { pool } = await poolRes.json();
+                
+                const balancesRes = await fetch(`${apiUrl}/cosmos/bank/v1beta1/balances/${pool.reserve_account_address}`);
+                const { balances } = await balancesRes.json();
+
+                currentPool = {
+                    id: poolId,
+                    denoms: pool.reserve_coin_denoms,
+                    reserves: balances.reduce((acc, coin) => {
+                        acc[coin.denom] = (coin.amount / decimalMultiplier).toFixed(6);
+                        return acc;
+                    }, {})
+                };
+
+                updateTokenSelection();
+                updateBalances();
+                calculatePrice();
+            } catch (error) {
+                showStatus(`Pool Error: ${error.message}`, 'error');
+            }
+        }
+
+        function updateTokenSelection() {
+            const fromSelect = document.getElementById('from-denom');
+            const toSelect = document.getElementById('to-denom');
+            
+            fromSelect.innerHTML = currentPool.denoms.map(denom => `
+                <option value="${denom}">${formatDenom(denom)}</option>
+            `).join('');
+
+            toSelect.innerHTML = currentPool.denoms.map(denom => `
+                <option value="${denom}">${formatDenom(denom)}</option>
+            `).join('');
+
+            // Set initial selection
+            if(currentPool.denoms.length >= 2) {
+                fromSelect.value = currentPool.denoms[0];
+                toSelect.value = currentPool.denoms[1];
+            }
+            
+            updateSwapParams();
+        }
+
+        function swapDirection() {
+            const fromDenom = document.getElementById('from-denom').value;
+            const toDenom = document.getElementById('to-denom').value;
+            
+            document.getElementById('from-denom').value = toDenom;
+            document.getElementById('to-denom').value = fromDenom;
+            
+            updateSwapParams();
+        }
+
+        function setMaxBalance() {
+            const fromDenom = document.getElementById('from-denom').value;
+            document.getElementById('from-amount').value = userBalances[fromDenom] || 0;
+            calculatePrice();
+        }
+
+        function updateBalances() {
+            const fromDenom = document.getElementById('from-denom').value;
+            const toDenom = document.getElementById('to-denom').value;
+            
+            document.getElementById('from-balance').textContent = userBalances[fromDenom] || '0.00';
+            document.getElementById('to-balance').textContent = userBalances[toDenom] || '0.00';
+            
+            // Update pool balances display
+            document.getElementById('pool-balances').innerHTML = Object.entries(currentPool.reserves)
+                .map(([denom, amount]) => `
+                    <div class="balance-display">
+                        <span>${formatDenom(denom)}:</span>
+                        <span>${amount}</span>
+                    </div>
+                `).join('');
+        }
+
+        function calculatePrice() {
+            try {
+                const fromDenom = document.getElementById('from-denom').value;
+                const toDenom = document.getElementById('to-denom').value;
+                const fromAmount = parseFloat(document.getElementById('from-amount').value) || 0;
+                
+                const fromReserve = parseFloat(currentPool.reserves[fromDenom]);
+                const toReserve = parseFloat(currentPool.reserves[toDenom]);
+
+                // Constant product formula
+                const k = fromReserve * toReserve;
+                const newFrom = fromReserve + fromAmount;
+                const newTo = k / newFrom;
+                const output = toReserve - newTo;
+                const priceImpact = ((fromAmount / (fromReserve + fromAmount)) * 100).toFixed(2);
+                const fee = (fromAmount * 0.003).toFixed(6);
+
+                document.getElementById('to-amount').value = output.toFixed(6);
+                document.getElementById('price-impact').textContent = `${priceImpact}%`;
+                document.getElementById('swap-fee').textContent = `${fee} ${formatDenom(fromDenom)}`;
+            } catch (error) {
+                showStatus(`Calculation Error: ${error.message}`, 'error');
+            }
+        }
+        async function executeSwap() {
+            try {
+                // const { SigningStargateClient } = cosmjsStargate;
+                // const { Registry } = cosmjsProtoSigning;
+                // const { AminoTypes } = cosmjsAmino;
+
+                if (!window.keplr || !walletAddress) throw new Error('Wallet not connected');
+                
+                const offlineSigner = window.keplr.getOfflineSigner(chainId);
+                
+                const client = await SigningStargateClient.connectWithSigner(
+                    rpcUrl,
+                    offlineSigner,
+                    {
+                        registry: new Registry(),
+                        aminoTypes: new AminoTypes()
+                    }
+                );
+
+                const fromDenom = document.getElementById('from-denom').value;
+                const toDenom = document.getElementById('to-denom').value;
+                const fromAmount = document.getElementById('from-amount').value;
+                const outputAmount = document.getElementById('to-amount').value;
+
+                const msg = {
+                    typeUrl: '/cosmos.liquidity.v1beta1.MsgSwapWithinBatch',
+                    value: {
+                        swap_requester_address: walletAddress,
+                        pool_id: currentPool.id,
+                        swap_type: currentPool.denoms[0] === fromDenom ? 1 : 2,
+                        offer_coin: {
+                            denom: fromDenom,
+                            amount: String(Math.floor(fromAmount * decimalMultiplier))
+                        },
+                        demand_denom: toDenom,
+                        offer_coin_fee: {
+                            denom: fromDenom,
+                            amount: String(Math.floor(fromAmount * 0.003 * decimalMultiplier))
+                        },
+                        order_price: outputAmount
+                    }
+                };
+
+                const tx = await client.signAndBroadcast(
+                    walletAddress,
+                    [msg],
+                    {
+                        amount: [],
+                        gas: "300000",
+                        feeDenom: "uarkh"
+                    }
+                );
+
+                showStatus(`Swap successful! TX Hash: ${tx.transactionHash}`, 'success');
+                await Promise.all([loadUserBalances(), loadPoolDetails()]);
+            } catch (error) {
+                showStatus(`Swap Failed: ${error.message}`, 'error');
+            }
+        }
+
+        
+
+        function formatDenom(denom) {
+            return tokenRegistry[denom]?.symbol || denom;
+        }
+
+        function formatDenoms(denoms) {
+            return denoms.map(d => formatDenom(d)).join('/');
+        }
+
+        function showStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = type;
+            statusDiv.innerHTML = message;
+            if (type === 'success') setTimeout(() => statusDiv.innerHTML = '', 15000);
+        }
+
+        function calculatePrice() {
+            try {
+                const fromDenom = document.getElementById('from-denom').value;
+                const toDenom = document.getElementById('to-denom').value;
+                const fromAmount = parseFloat(document.getElementById('from-amount').value) || 0;
+                
+                const fromReserve = parseFloat(currentPool.reserves[fromDenom]);
+                const toReserve = parseFloat(currentPool.reserves[toDenom]);
+
+                // Constant product formula
+                const k = fromReserve * toReserve;
+                const newFrom = fromReserve + fromAmount;
+                const newTo = k / newFrom;
+                const output = toReserve - newTo;
+                const priceImpact = ((fromAmount / (fromReserve + fromAmount)) * 100);
+                const fee = (fromAmount * 0.003);
+
+                document.getElementById('to-amount').value = output.toFixed(6);
+                document.getElementById('price-impact').textContent = `${priceImpact.toFixed(2)}%`;
+                document.getElementById('swap-fee').textContent = `${fee.toFixed(6)} ${formatDenom(fromDenom)}`;
+                
+                // Show price impact warning
+                showPriceImpactWarning(priceImpact);
+            } catch (error) {
+                showStatus(`Calculation Error: ${error.message}`, 'error');
+            }
+        }
+        
+        function showPriceImpactWarning(priceImpact) {
+            const warningDiv = document.getElementById('price-impact-warning');
+            const priceImpactElement = document.getElementById('price-impact');
+            
+            if (priceImpact > 5) {
+                warningDiv.textContent = 'High price impact! Consider a different pool or amount.';
+                priceImpactElement.classList.add('high-impact');
+                priceImpactElement.classList.remove('moderate-impact');
+            } else if (priceImpact > 1) {
+                warningDiv.textContent = 'Moderate price impact. Be cautious with large trades.';
+                priceImpactElement.classList.add('moderate-impact');
+                priceImpactElement.classList.remove('high-impact');
+            } else {
+                warningDiv.textContent = '';
+                priceImpactElement.classList.remove('high-impact', 'moderate-impact');
+            }
+        }
+
+    </script>
+</body>
+</html>
